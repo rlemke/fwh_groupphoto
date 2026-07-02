@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+# model side-effects / caches
+gfpgan/
+*.onnx
+# scratch outputs
+out/
+out_jpg/
+*.tif
+*.tiff

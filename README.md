@@ -1,0 +1,106 @@
+# fwh_groupphoto
+
+Enhance **posed group-gathering photos** — a family/team/reunion shot where people
+have arranged themselves for one picture. Unlike the per-rider cycling pipeline
+([fwh_peloton](https://github.com/rlemke/fwh_peloton), which this reuses), it produces
+**one enhanced photo per input** (the whole frame, faces fixed in place) and can
+optionally swap the background.
+
+```
+group photo (RAW/JPEG/HEIC)
+  → load 16-bit (+ RAW highlight recovery)
+  → glare: CLAHE local-contrast (+ optional dark-channel dehaze)
+  → tone: auto-brighten (metered on the people) + black/white-point dehaze  [16-bit, banding-free]
+  → deblur: whole-frame unsharp + optional face restoration (GFPGAN/CodeFormer)
+  → [optional] background: matte the group → composite onto blur / bokeh / a supplied image
+  → out/<stem>_enhanced.{tif,jpg}
+```
+
+Three corrections, honest about what's recoverable:
+
+- **Blurriness** — face restoration reconstructs soft faces (the perceptual win in a
+  group shot) + a gentle global unsharp. A dedicated deblur model (NAFNet) is opt-in/phase 2.
+- **Glare** — veiling sun-haze is genuinely fixable (CLAHE + optional dehaze). Blown
+  windows behind the group are best recovered **at RAW decode** (`--highlight-mode`);
+  fully-clipped pixels carry no data (only hideable by inpainting, phase 2). Eyeglass
+  glare that occludes the eyes is left alone — inpainting would fabricate eyes.
+- **Prettier background** (`--background`) — matte the group and composite onto a blurred
+  version of the same frame, a bokeh blur, or a supplied image. AI-generated backdrops are
+  phase 3.
+
+A Facetwork domain package following the tools/handlers pattern. This ships the reusable
+**library + CLI tools** (`src/groupphoto/tools/`); the FFL handlers/workflow (→ a fleet
+runner) are the next phase.
+
+## Tools
+
+| Tool | Does |
+|------|------|
+| `enhance-group`  | One photo → one enhanced photo (glare + deblur + optional new bg) |
+| `batch-group`    | A directory → enhanced outputs + running `manifest.json` (`--resume`) |
+| `replace-bg`     | Just the background step (matte + composite) on one photo |
+| `tiffs-to-jpegs` | Derive shareable 8-bit JPEGs from the 16-bit TIFF masters |
+
+Every tool: JSON on **stdout**, logs on **stderr**, `--use-mock` (offline, no models),
+`--log-level`. Heavy ML deps are **optional extras, lazily imported** — the pipeline
+degrades gracefully (glare/tone/sharpen run on the core deps alone; face-restore →
+passthrough, matte → background change skipped, when their extras are absent).
+
+## Quick start
+
+```bash
+pip install -e '.[detect,enhance,matte,raw]'      # full; core alone runs degraded
+
+# a group RAW → cleaned up, lossless 16-bit TIFF (default: keep original background):
+python src/groupphoto/tools/enhance_group.py --image group.NEF --out-dir out/
+
+# recover blown windows + a bokeh background, as a shareable JPEG:
+python src/groupphoto/tools/enhance_group.py --image group.NEF --out-dir out/ \
+    --highlight-mode reconstruct --background bokeh --out-format jpg
+
+# a whole folder, resumable:
+python src/groupphoto/tools/batch_group.py --in-dir photos/ --out-dir out/ \
+    --background blur --out-format tiff --resume
+
+# derive JPEGs from the TIFF masters:
+python src/groupphoto/tools/tiffs_to_jpegs.py --in-dir out/ --out-dir out_jpg/
+```
+
+## Extras (optional, lazy-imported — pipeline degrades gracefully without them)
+
+| Extra | Enables |
+|-------|---------|
+| `detect`  | Person detection for exposure metering + headcount (ultralytics/torch) |
+| `enhance` | Face restoration — GFPGAN/CodeFormer (spandrel/gfpgan) |
+| `matte`   | Background matting — BiRefNet/isnet via `rembg` (onnxruntime) |
+| `raw`     | Camera RAW decode + highlight recovery (rawpy/LibRaw) |
+| `inpaint` | *(phase 2)* LaMa inpaint for blown windows / speculars (iopaint) |
+| `ai`      | *(phase 3)* AI-generated backgrounds (diffusers/transformers) |
+| `s3`      | S3/MinIO storage (boto3) |
+
+Model weights cache under `~/.cache/groupphoto/weights`. Reuse fwh_peloton's already-
+downloaded GFPGAN/RealESRGAN weights by symlinking that dir if present.
+
+## Layout
+
+```
+src/groupphoto/tools/
+  enhance_group  batch_group  replace_bg  tiffs_to_jpegs        (+ .sh wrappers)
+  _groupphoto_tools/
+    images crop quality detect enhance segment sidecar storage  (reused from fwh_peloton)
+    glare deblur background pipeline groupphoto_mocks           (new)
+tests/             offline suite (19 tests, no network/models via --use-mock)
+```
+
+## Tests
+
+```bash
+pip install -e '.[test]' && pytest -q          # all offline
+```
+
+## Status
+
+Phase 1 (v1) — the tools library + CLIs. Deblur = face-restore + unsharp; glare = CLAHE +
+RAW highlight recovery + optional DCP dehaze; background = none/blur/bokeh/image via
+rembg-BiRefNet matte. Phase 2 (LaMa inpaint, NAFNet `--deblur`), phase 3 (AI backgrounds),
+and phase 4 (`facetwork.domains` entry point → fleet runner) are planned.
