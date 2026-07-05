@@ -1,0 +1,57 @@
+// fwh_groupphoto — enhance posed group-gathering photos, as FFL.
+//
+// Image data flows BY REFERENCE (filesystem / MinIO paths). Each event facet is a
+// whole-photo operation that reads a path and writes one output file, mirroring the
+// enhance_group / batch_group / replace_bg / nef_to_tif CLIs.
+
+namespace groupphoto {
+    schema EnhanceResult { output: String, n_people: Long }
+}
+
+namespace groupphoto.Ingest {
+    /** List the processable image/RAW files in a directory (returns their paths). */
+    event facet ListImages(in_dir: String) => (paths: Json, count: Long)
+        with Effect(kind = "io")
+
+    /** Convert one RAW/image to a full-resolution 16-bit TIFF — verbatim, no crop or
+        enhancement (a 45 MP NEF → an 8288x5520 16-bit TIFF). */
+    event facet ConvertRaw(image_path: String, out_dir: String, highlight_mode: String = "clip") => (output: String)
+        with Effect(kind = "io")
+}
+
+namespace groupphoto.Enhance {
+    /** Enhance one posed group photo IN PLACE — glare/highlight correction + deblur
+        (face restore) + tone cleanup, with an optional background swap
+        (none/blur/bokeh/image). Returns the output path and the people count. */
+    event facet EnhanceGroup(image_path: String, out_dir: String, background: String = "none", out_format: String = "tiff", highlight_mode: String = "clip") => (output: String, n_people: Long)
+        with Effect(kind = "io")
+
+    /** Replace only the background: matte the group and composite onto a blurred
+        version of the same frame, or a supplied image. */
+    event facet ReplaceBackground(image_path: String, out_dir: String, mode: String = "blur", bg_image: String = "") => (output: String)
+        with Effect(kind = "io")
+}
+
+namespace groupphoto.workflows {
+    use groupphoto.Ingest
+    use groupphoto.Enhance
+
+    /** One group photo → one enhanced photo. */
+    workflow EnhanceOne(image_path: String, out_dir: String, background: String = "none") => (output: String) andThen {
+        done = EnhanceGroup(image_path = $.image_path, out_dir = $.out_dir, background = $.background)
+        yield EnhanceOne(output = done.output)
+    }
+
+    /** Many group photos → enhanced photos (fan out per photo). Get ``paths`` from
+        ListImages(in_dir). */
+    workflow EnhanceBatch(paths: Json, out_dir: String, background: String = "none") => (count: Long) andThen foreach path in $.paths {
+        done = EnhanceGroup(image_path = $.path, out_dir = $.out_dir, background = $.background)
+        yield EnhanceBatch(count = 1)
+    }
+
+    /** Convert many RAW files → full-resolution 16-bit TIFF (fan out per file). */
+    workflow ConvertBatch(paths: Json, out_dir: String) => (count: Long) andThen foreach path in $.paths {
+        done = ConvertRaw(image_path = $.path, out_dir = $.out_dir)
+        yield ConvertBatch(count = 1)
+    }
+}

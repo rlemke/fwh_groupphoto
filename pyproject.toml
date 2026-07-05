@@ -29,8 +29,12 @@ inpaint = ["iopaint>=1.3"]  # phase 2: LaMa inpaint (blown windows / speculars)
 ai = ["diffusers>=0.27", "transformers>=4.40"]  # phase 3: AI-generated backgrounds
 test = ["pytest>=7.4"]
 
-# NOTE: the facetwork.domains entry point + handlers/ + ffl/ are the next phase
-# (turning these tools into a fleet workflow). Left out until the handlers land.
+# FFL-workflow layer: install '.[domain]' to run groupphoto as a Facetwork workflow.
+# The tools/library install fine without it.
+domain = ["facetwork>=0.31.0"]
+
+[project.entry-points."facetwork.domains"]
+groupphoto = "groupphoto:domain"
 
 [tool.setuptools.packages.find]
 where = ["src"]

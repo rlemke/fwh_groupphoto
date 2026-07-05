@@ -40,6 +40,7 @@ runner) are the next phase.
 | `batch-group`    | A directory → enhanced outputs + running `manifest.json` (`--resume`) |
 | `replace-bg`     | Just the background step (matte + composite) on one photo |
 | `tiffs-to-jpegs` | Derive shareable 8-bit JPEGs from the 16-bit TIFF masters |
+| `nef-to-tif`     | Verbatim RAW → 16-bit TIFF at the **original** sensor resolution (no enhance) |
 
 Every tool: JSON on **stdout**, logs on **stderr**, `--use-mock` (offline, no models),
 `--log-level`. Heavy ML deps are **optional extras, lazily imported** — the pipeline
@@ -64,6 +65,29 @@ python src/groupphoto/tools/batch_group.py --in-dir photos/ --out-dir out/ \
 
 # derive JPEGs from the TIFF masters:
 python src/groupphoto/tools/tiffs_to_jpegs.py --in-dir out/ --out-dir out_jpg/
+
+# verbatim RAW → 16-bit TIFF at original resolution (a 45 MP NEF → 8288×5520):
+python src/groupphoto/tools/nef_to_tif.py --in-dir raws/ --out-dir tifs/
+```
+
+## Run as an FFL workflow
+
+The tools are exposed as a Facetwork domain (`facetwork.domains` entry point +
+`handlers/` + `ffl/groupphoto.ffl`), so the pipeline runs on the runtime / fleet.
+
+Event facets (image data flows **by reference** — file/MinIO paths):
+- `groupphoto.Enhance.EnhanceGroup(image_path, out_dir, background, …)` → `(output, n_people)`
+- `groupphoto.Enhance.ReplaceBackground(image_path, out_dir, mode, bg_image)` → `(output)`
+- `groupphoto.Ingest.ConvertRaw(image_path, out_dir, highlight_mode)` → `(output)`
+- `groupphoto.Ingest.ListImages(in_dir)` → `(paths, count)`
+
+Workflows: `EnhanceOne`, `EnhanceBatch(paths, out_dir, background)` (fan out per photo),
+`ConvertBatch(paths, out_dir)`.
+
+```bash
+pip install -e '.[detect,enhance,matte,raw,domain]'      # domain = the facetwork runtime
+facetwork compile src/groupphoto/ffl/groupphoto.ffl --check
+python -m facetwork.domains --seed groupphoto            # register handlers + seed the flows
 ```
 
 ## Extras (optional, lazy-imported — pipeline degrades gracefully without them)
@@ -77,6 +101,7 @@ python src/groupphoto/tools/tiffs_to_jpegs.py --in-dir out/ --out-dir out_jpg/
 | `inpaint` | *(phase 2)* LaMa inpaint for blown windows / speculars (iopaint) |
 | `ai`      | *(phase 3)* AI-generated backgrounds (diffusers/transformers) |
 | `s3`      | S3/MinIO storage (boto3) |
+| `domain`  | Run as an FFL workflow on the Facetwork runtime (facetwork) |
 
 Model weights cache under `~/.cache/groupphoto/weights`. Reuse fwh_peloton's already-
 downloaded GFPGAN/RealESRGAN weights by symlinking that dir if present.
@@ -84,12 +109,15 @@ downloaded GFPGAN/RealESRGAN weights by symlinking that dir if present.
 ## Layout
 
 ```
-src/groupphoto/tools/
-  enhance_group  batch_group  replace_bg  tiffs_to_jpegs        (+ .sh wrappers)
-  _groupphoto_tools/
-    images crop quality detect enhance segment sidecar storage  (reused from fwh_peloton)
-    glare deblur background pipeline groupphoto_mocks           (new)
-tests/             offline suite (19 tests, no network/models via --use-mock)
+src/groupphoto/
+  tools/
+    enhance_group batch_group replace_bg tiffs_to_jpegs nef_to_tif  (+ .sh wrappers)
+    _groupphoto_tools/
+      images crop quality detect enhance segment sidecar storage  (reused from fwh_peloton)
+      glare deblur background pipeline groupphoto_mocks           (new)
+  ffl/groupphoto.ffl   event facets + workflows
+  handlers/            ingest/ + enhance/ (RegistryRunner dispatch) + shared/ shim
+tests/                 offline suite (24 tests, no network/models via --use-mock)
 ```
 
 ## Tests
