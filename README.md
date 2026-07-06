@@ -40,7 +40,7 @@ runner) are the next phase.
 | `batch-group`    | A directory → enhanced outputs + running `manifest.json` (`--resume`) |
 | `replace-bg`     | Just the background step (matte + composite) on one photo |
 | `tiffs-to-jpegs` | Derive shareable 8-bit JPEGs from the 16-bit TIFF masters |
-| `nef-to-tif`     | Verbatim RAW → 16-bit TIFF at the **original** sensor resolution (no enhance) |
+| `convert-photos` | Convert **RAW/TIFF/JPEG → TIFF or JPEG** at any resolution (`--format`/`--resize`), recursive + adaptive-parallel. (`nef-to-tif` is a RAW→TIFF alias.) |
 
 Every tool: JSON on **stdout**, logs on **stderr**, `--use-mock` (offline, no models),
 `--log-level`. Heavy ML deps are **optional extras, lazily imported** — the pipeline
@@ -66,12 +66,14 @@ python src/groupphoto/tools/batch_group.py --in-dir photos/ --out-dir out/ \
 # derive JPEGs from the TIFF masters:
 python src/groupphoto/tools/tiffs_to_jpegs.py --in-dir out/ --out-dir out_jpg/
 
-# verbatim RAW → 16-bit TIFF at original resolution (a 45 MP NEF → 8288×5520):
-python src/groupphoto/tools/nef_to_tif.py --in-dir raws/ --out-dir tifs/
-# …or recurse a whole tree, mirroring the input directory structure (resumable):
-python src/groupphoto/tools/nef_to_tif.py --in-dir shoots/ --out-dir tifs/ --recursive --resume
-# converts in parallel by default (--workers auto): sizes to free CPUs, ramps up
-# while there's headroom and backs off when the box saturates. Pin with --workers N.
+# convert RAW/TIFF/JPEG → TIFF or JPEG, any resolution (convert-photos):
+python src/groupphoto/tools/convert_photos.py --image shot.NEF --out-dir out/                 # RAW → 16-bit TIFF, full res
+python src/groupphoto/tools/convert_photos.py --image master.tif --out-dir out/ --format jpeg --resize 2048  # TIF → JPEG, long edge 2048
+python src/groupphoto/tools/convert_photos.py --in-dir jpgs/ --out-dir tifs/ --from jpg      # JPEG → TIFF
+# a whole tree, mirroring structure (RAW → JPEG @ 3000px), resumable + adaptive-parallel:
+python src/groupphoto/tools/convert_photos.py --in-dir shoots/ --out-dir out/ --recursive --format jpeg --resize 3000 --resume
+#   --format tif|jpeg · --quality N · --resize N|WxH|50% · --from raw|any|<ext list>
+#   --workers auto (default): sizes to free CPUs, ramps up on headroom, backs off on saturation
 ```
 
 ## Run as an FFL workflow
