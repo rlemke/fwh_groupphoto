@@ -41,6 +41,7 @@ runner) are the next phase.
 | `replace-bg`     | Just the background step (matte + composite) on one photo |
 | `tiffs-to-jpegs` | Derive shareable 8-bit JPEGs from the 16-bit TIFF masters |
 | `convert-photos` | Convert **RAW/TIFF/JPEG → TIFF or JPEG** at any resolution (`--format`/`--resize`), recursive + adaptive-parallel. (`nef-to-tif` is a RAW→TIFF alias.) |
+| `copy-tree`      | Parallel recursive directory copy — mirror a tree, restart-safe (`--workers`) |
 
 Every tool: JSON on **stdout**, logs on **stderr**, `--use-mock` (offline, no models),
 `--log-level`. Heavy ML deps are **optional extras, lazily imported** — the pipeline
@@ -85,10 +86,17 @@ Event facets (image data flows **by reference** — file/MinIO paths):
 - `groupphoto.Enhance.EnhanceGroup(image_path, out_dir, background, …)` → `(output, n_people)`
 - `groupphoto.Enhance.ReplaceBackground(image_path, out_dir, mode, bg_image)` → `(output)`
 - `groupphoto.Ingest.ConvertRaw(image_path, out_dir, highlight_mode)` → `(output)`
+- `groupphoto.Ingest.ConvertTree(in_dir, out_dir, out_format, resize, from_sel, …)` → `(converted, skipped, failed)` — **multi-threaded** whole-directory/tree convert (RAW/TIFF/JPEG → TIFF/JPEG)
+- `groupphoto.Ingest.CopyTree(src, dst, workers)` → `(copied, skipped, failed)` — **multi-threaded** recursive copy
 - `groupphoto.Ingest.ListImages(in_dir)` → `(paths, count)`
 
 Workflows: `EnhanceOne`, `EnhanceBatch(paths, out_dir, background)` (fan out per photo),
-`ConvertBatch(paths, out_dir)`.
+`ConvertBatch(paths, out_dir)` (fleet fan-out, one task/file), `ConvertDir(in_dir, out_dir, …)`
+(one step, multi-threaded), `CopyDir(src, dst)`.
+
+The **multi-threaded** conversion/copy engine (adaptive `--workers auto` — sizes to free
+CPUs, ramps up on headroom, backs off on saturation) is shared by the CLIs
+(`convert-photos`, `copy-tree`) and these handlers.
 
 ```bash
 pip install -e '.[detect,enhance,matte,raw,domain]'      # domain = the facetwork runtime
@@ -117,13 +125,13 @@ downloaded GFPGAN/RealESRGAN weights by symlinking that dir if present.
 ```
 src/groupphoto/
   tools/
-    enhance_group batch_group replace_bg tiffs_to_jpegs nef_to_tif  (+ .sh wrappers)
+    enhance_group batch_group replace_bg tiffs_to_jpegs convert_photos copy_tree  (+ .sh)
     _groupphoto_tools/
       images crop quality detect enhance segment sidecar storage  (reused from fwh_peloton)
-      glare deblur background pipeline groupphoto_mocks           (new)
+      glare deblur background pipeline copytree groupphoto_mocks  (new)
   ffl/groupphoto.ffl   event facets + workflows
-  handlers/            ingest/ + enhance/ (RegistryRunner dispatch) + shared/ shim
-tests/                 offline suite (24 tests, no network/models via --use-mock)
+  handlers/            ingest/ (list/convert/convert-tree/copy-tree) + enhance/ + shared/ shim
+tests/                 offline suite (35 tests, no network/models via --use-mock)
 ```
 
 ## Tests

@@ -13,6 +13,7 @@ _TOOLS = Path(__file__).resolve().parents[2] / "tools"
 if str(_TOOLS) not in sys.path:
     sys.path.insert(0, str(_TOOLS))
 
-from _groupphoto_tools import background, images, pipeline  # noqa: E402,F401
+from _groupphoto_tools import background, copytree, images, pipeline  # noqa: E402,F401
+import convert_photos  # noqa: E402,F401  (tools-level module, not under _groupphoto_tools)
 
-__all__ = ["background", "images", "pipeline"]
+__all__ = ["background", "copytree", "images", "pipeline", "convert_photos"]

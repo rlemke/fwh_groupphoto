@@ -26,9 +26,31 @@ def test_domain_registers_expected_facets():
     assert r.names == {
         "groupphoto.Ingest.ListImages",
         "groupphoto.Ingest.ConvertRaw",
+        "groupphoto.Ingest.ConvertTree",
+        "groupphoto.Ingest.CopyTree",
         "groupphoto.Enhance.EnhanceGroup",
         "groupphoto.Enhance.ReplaceBackground",
     }
+
+
+def test_convert_tree_and_copy_tree_handlers(tmp_path):
+    from PIL import Image
+
+    from groupphoto.handlers.ingest.ingest_handlers import handle
+    src = tmp_path / "in" / "e1"
+    src.mkdir(parents=True)
+    for n in ("a", "b"):
+        Image.fromarray(np.random.default_rng(4).integers(0, 256, (60, 90, 3)).astype("uint8")).save(src / f"{n}.jpg")
+    # multi-threaded whole-tree convert (jpg → tif), via the dispatch entrypoint
+    r1 = handle({"_facet_name": "groupphoto.Ingest.ConvertTree", "in_dir": str(tmp_path / "in"),
+                 "out_dir": str(tmp_path / "tif"), "from_sel": "jpg", "workers": 2})
+    assert r1 == {"converted": 2, "skipped": 0, "failed": 0}
+    assert (tmp_path / "tif" / "e1" / "a.tif").is_file()
+    # multi-threaded recursive copy
+    r2 = handle({"_facet_name": "groupphoto.Ingest.CopyTree", "src": str(tmp_path / "tif"),
+                 "dst": str(tmp_path / "copy"), "workers": 2})
+    assert r2["copied"] >= 2 and r2["failed"] == 0
+    assert (tmp_path / "copy" / "e1" / "a.tif").is_file()
 
 
 def test_enhance_group_handler_mock(tmp_path):
