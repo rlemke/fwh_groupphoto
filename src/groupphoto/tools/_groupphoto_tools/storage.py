@@ -1,10 +1,10 @@
-"""Storage for the s2 tools — local filesystem or S3/MinIO.
+"""Storage for the groupphoto tools — local filesystem or S3/MinIO.
 
 One backend, selected by ``FW_STORAGE`` (``local`` default, or ``s3``). All
 file I/O in ``_groupphoto_tools`` (the sidecar cache + the rendered map bundle) goes
 through ``read_bytes`` / ``write_bytes`` / ``exists`` / ``list_files`` here, so
 the same code path produces a local tree or S3 objects. On ``s3`` the cache lands
-at ``s3://<bucket>/cache/s2/…`` and the map bundle at ``s3://<bucket>/output/s2/…``
+at ``s3://<bucket>/cache/groupphoto/…`` and the map bundle at ``s3://<bucket>/output/groupphoto/…``
 (which the dashboard's /output/raw artifact server can serve).
 
 Conforms to agent-spec/cache-layout. S3 needs ``boto3`` (``pip install -e ".[s3]"``)
@@ -51,7 +51,7 @@ def output_root() -> str:
     it's ``FW_OUTPUT_BASE`` or ``<data_root>/output``.
     """
     if backend() == "s3":
-        ob = os.environ.get("FW_S2_OUTPUT_BASE") or os.environ.get("FW_OUTPUT_BASE")
+        ob = os.environ.get("FW_GROUPPHOTO_OUTPUT_BASE") or os.environ.get("FW_OUTPUT_BASE")
         if ob and is_s3(ob):
             return ob
         return join(data_root(), "output")
