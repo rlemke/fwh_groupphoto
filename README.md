@@ -32,6 +32,25 @@ A Facetwork domain package following the tools/handlers pattern. This ships the 
 **library + CLI tools** (`src/groupphoto/tools/`); the FFL handlers/workflow (→ a fleet
 runner) are the next phase.
 
+## Feature specifications
+
+Per-feature specs live in [`docs/`](docs/README.md) — how each feature works, whether it
+**fans out** across the fleet, its **facets & workflows**, **external libraries/binaries**,
+and its **cache/output**. Start with the flagship [Enhance Pipeline](docs/enhance-pipeline.md).
+
+| Spec | What it covers |
+|------|----------------|
+| [enhance-pipeline](docs/enhance-pipeline.md) | **Flagship** — one group photo → one enhanced photo: load → detect/meter → glare → tone → deblur → background → save. |
+| [glare](docs/glare.md) | Glare/highlight correction: CLAHE, DCP dehaze, RAW `highlight_mode` recovery. |
+| [deblur](docs/deblur.md) | Whole-frame unsharp + GFPGAN/CodeFormer face restoration. |
+| [background](docs/background.md) | rembg/BiRefNet whole-group matte + composite (`ReplaceBackground`). |
+| [detect](docs/detect.md) | YOLO person detection → exposure metering on the group + headcount. |
+| [conversion](docs/conversion.md) | Adaptive multi-threaded RAW/TIFF/JPEG convert + tree copy (`Ingest.*`). |
+| [image-io](docs/image-io.md) | 16-bit load/save, RAW/HEIC/TIFF handling, the `tiffs-to-jpegs` derive step. |
+| [domain-and-cache](docs/domain-and-cache.md) | Domain wiring, the present-but-unwired cache infra, and reused/dormant code. |
+
+Full index: [`docs/README.md`](docs/README.md).
+
 ## Tools
 
 | Tool | Does |
