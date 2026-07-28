@@ -123,6 +123,43 @@ facetwork compile src/groupphoto/ffl/groupphoto.ffl --check
 python -m facetwork.domains --seed groupphoto            # register handlers + seed the flows
 ```
 
+### FFL at a glance
+
+A step is `name = Facet(args)`, later steps reference earlier ones as
+`step.field`, and `andThen foreach` fans the per-photo work out across the fleet:
+
+```ffl
+namespace my.groupphoto {
+
+    use groupphoto.Ingest
+    use groupphoto.Enhance
+
+    /** Enumerate a directory, then enhance every photo in parallel. */
+    workflow EnhanceDir(in_dir: String, out_dir: String, background: String = "blur") => (count: Long) andThen {
+
+        listed = groupphoto.Ingest.ListImages(in_dir = $.in_dir) andThen foreach p in $.paths {
+
+            done = groupphoto.Enhance.EnhanceGroup(
+                image_path = $.p, out_dir = $$.out_dir, background = $$.background)
+
+            yield EnhanceDir(count = 1)
+        }
+    }
+}
+```
+
+```bash
+fw ffl run --primary my.ffl --library src/groupphoto/ffl/groupphoto.ffl \
+  --workflow my.groupphoto.EnhanceDir \
+  --inputs '{"in_dir": "/data/raw", "out_dir": "/data/out"}'
+```
+
+📖 **[docs/ffl-examples.md](docs/ffl-examples.md)** — the full example gallery:
+fan-out from a facet list vs a CLI list, chaining enhance → background swap,
+`catch` so one corrupt file doesn't kill the batch, `when` guards, call-time
+mixins for long conversions, and reusing the shipped workflows. Every snippet
+there is compile-checked.
+
 ## Extras (optional, lazy-imported — pipeline degrades gracefully without them)
 
 | Extra | Enables |

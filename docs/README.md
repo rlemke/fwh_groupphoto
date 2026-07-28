@@ -39,6 +39,7 @@ orchestrating the four correction stages below.
 | Spec | What it covers |
 |------|----------------|
 | [domain-and-cache.md](domain-and-cache.md) | How the tools become a Facetwork domain (entry point, handler registration, the by-reference contract); the **present-but-unwired** `storage`/`sidecar` cache infra; the **reused-from-`fwh_peloton`, currently dormant** modules (`segment`, `quality`, `crop.cutout`, `upscale`). Read before assuming a facet is served or a cache is used. |
+| [ffl-examples.md](ffl-examples.md) | **Usage patterns.** A gallery of complete, compile-checked FFL examples over these facets — list→`foreach` fan-out, chained per-image steps, `catch` per photo, `when` guards, call-time mixins. |
 
 ---
 
