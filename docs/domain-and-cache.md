@@ -54,7 +54,7 @@ Facet signatures and returns are enumerated in the per-feature specs. The one sc
 
 - **`facetwork`** (extra `[domain]`, `>=0.31.0`) — only needed to run as a workflow; the
   tools/library install and test fine without it.
-- **`boto3`** (extra `[s3]`) — used *only* by `storage.py` (see the cache note below).
+- **`boto3`** (extra `[s3]`) — needed only on the S3 path of `storage.py` (see the cache note below).
 
 ## Facets & workflows
 
@@ -71,24 +71,21 @@ image work.
   `images.save_tiff16`/`save_image` (or the convert/copy engines). They do **not** route
   through a storage backend or a cache sidecar.
 - **`_groupphoto_tools/storage.py` (local | s3/MinIO) and `sidecar.py` (per-entry
-  `.meta.json` cache) exist and are complete** — `storage` dispatches `read_bytes`/
+  `.meta.json` cache) exist and are complete** — `storage` is a thin shim over the shared
+  `facetwork.domains.toolstorage` layer (`tool_storage("groupphoto")`; it was byte-identical
+  to fwh_sentinel2's copy apart from `NAMESPACE`) and dispatches `read_bytes`/
   `write_bytes`/`exists`/`list_files` on the path (local dir or `s3://…`), and `sidecar`
   implements a contention-free per-key cache under `<cache_root>/groupphoto/<type>/…`
   conforming to `agent-spec/cache-layout`. **But nothing in the handlers or the pipeline
   imports them yet** (verified: no importers outside the two modules). They are scaffolding
-  for a future MinIO-backed cache/output; today outputs are local files. Treat the module
-  docstrings' "s2 tools" / "map bundle" wording as copied-from-a-template — this domain
-  emits photos, not maps.
+  for a future MinIO-backed cache/output; today outputs are local files. Treat `sidecar.py`'s
+  docstring wording (`<cache_root>/s2/…`) as copied-from-a-template — the code uses the
+  `groupphoto` namespace.
 - The **`.env`/`FW_STORAGE`/`FW_S3_*`** contract the modules read matches the runtime's, so
   wiring them in later is a drop-in, not a redesign.
 
 ## Gotchas & notes
 
-- **README status vs. reality.** The repo README's top line says the FFL handlers/workflow
-  are "the next phase" and lists phase 4 as "planned," but the domain **is** implemented and
-  tested (`__init__.py` entry point + `handlers/` + `test_ffl_domain.py` register and run
-  the six facets). The README's *later* "Run as an FFL workflow" section is the accurate
-  one; the intro line lags.
 - **Reused-from-`fwh_peloton`, currently dormant** (present in `_groupphoto_tools`, not
   reached by any group-photo facet/CLI or the pipeline — verified no importers):
   - `segment.py` — box-prompted SAM per-rider cutout masks.

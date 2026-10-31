@@ -29,8 +29,10 @@ Three corrections, honest about what's recoverable:
   phase 3.
 
 A Facetwork domain package following the tools/handlers pattern. This ships the reusable
-**library + CLI tools** (`src/groupphoto/tools/`); the FFL handlers/workflow (→ a fleet
-runner) are the next phase.
+**library + CLI tools** (`src/groupphoto/tools/`) plus the FFL layer (`ffl/` + `handlers/`,
+exposed through the `facetwork.domains` entry point) that runs them as workflows on the
+Facetwork runtime. It is catalogued but deliberately not baked into the fleet image (heavy
+CV deps), so it runs from a local checkout.
 
 ## Feature specifications
 
@@ -200,5 +202,6 @@ pip install -e '.[test]' && pytest -q          # all offline
 
 Phase 1 (v1) — the tools library + CLIs. Deblur = face-restore + unsharp; glare = CLAHE +
 RAW highlight recovery + optional DCP dehaze; background = none/blur/bokeh/image via
-rembg-BiRefNet matte. Phase 2 (LaMa inpaint, NAFNet `--deblur`), phase 3 (AI backgrounds),
-and phase 4 (`facetwork.domains` entry point → fleet runner) are planned.
+rembg-BiRefNet matte. The `facetwork.domains` entry point + FFL handlers/workflows are
+implemented (see "Run as an FFL workflow" above). Phase 2 (LaMa inpaint, NAFNet `--deblur`)
+and phase 3 (AI backgrounds) are planned.
